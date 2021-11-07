@@ -9,12 +9,12 @@ use {
     std::{fmt::Debug, marker::PhantomData},
 };
 
-pub struct Glue<T: Debug, U: GStore<T> + GStoreMut<T>> {
+pub struct Glue<T: Debug, U: GStore<T> + GStoreMut<T> + Send> {
     _marker: PhantomData<T>,
     pub storage: Option<U>,
 }
 
-impl<T: Debug, U: GStore<T> + GStoreMut<T>> Glue<T, U> {
+impl<T: Debug, U: GStore<T> + GStoreMut<T> + Send> Glue<T, U> {
     pub fn new(storage: U) -> Self {
         let storage = Some(storage);
 
@@ -76,7 +76,7 @@ mod tests {
         std::fmt::Debug,
     };
 
-    fn basic<T: Debug, U: GStore<T> + GStoreMut<T>>(mut glue: Glue<T, U>) {
+    fn basic<T: Debug, U: GStore<T> + GStoreMut<T> + Send>(mut glue: Glue<T, U>) {
         assert_eq!(
             glue.execute("DROP TABLE IF EXISTS api_test"),
             Ok(Payload::DropTable)
@@ -121,7 +121,7 @@ mod tests {
         );
     }
 
-    async fn basic_async<T: Debug, U: GStore<T> + GStoreMut<T>>(mut glue: Glue<T, U>) {
+    async fn basic_async<T: Debug, U: GStore<T> + GStoreMut<T> + Send>(mut glue: Glue<T, U>) {
         assert_eq!(
             glue.execute_async("DROP TABLE IF EXISTS api_test").await,
             Ok(Payload::DropTable)
