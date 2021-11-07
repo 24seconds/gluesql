@@ -31,6 +31,7 @@ struct Item {
 pub struct MemoryStorage {
     id_counter: u64,
     items: HashMap<String, Item>,
+    pub val: std::rc::Rc<i64>,
 }
 
 #[async_trait(?Send)]
