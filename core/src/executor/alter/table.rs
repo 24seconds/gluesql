@@ -10,7 +10,7 @@ use {
     futures::stream::{self, TryStreamExt},
 };
 
-pub async fn create_table<T: GStore + GStoreMut>(
+pub async fn create_table<T: GStore + GStoreMut + std::fmt::Debug>(
     storage: T,
     name: &ObjectName,
     column_defs: &[ColumnDef],
@@ -84,7 +84,7 @@ pub async fn create_table<T: GStore + GStoreMut>(
     }
 }
 
-pub async fn drop_table<T: GStore + GStoreMut>(
+pub async fn drop_table<T: GStore + GStoreMut + std::fmt::Debug>(
     storage: T,
     table_names: &[ObjectName],
     if_exists: bool,

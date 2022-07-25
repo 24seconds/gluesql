@@ -20,7 +20,7 @@ use {
     futures::stream::{self, TryStreamExt},
 };
 
-pub async fn alter_table<T: GStore + GStoreMut>(
+pub async fn alter_table<T: GStore + GStoreMut + std::fmt::Debug>(
     storage: T,
     name: &ObjectName,
     operation: &AlterTableOperation,

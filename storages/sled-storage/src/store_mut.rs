@@ -196,17 +196,20 @@ impl StoreMut for SledStorage {
     }
 
     async fn update_data(self, table_name: &str, rows: Vec<(Key, Row)>) -> MutResult<Self, ()> {
+        tracing::info!("[update_data] started");
         let state = &self.state;
         let tx_timeout = self.tx_timeout;
         let tx_rows = &rows;
 
         let tx_result = self.tree.transaction(move |tree| {
+            tracing::debug!("[update_data] inside transaction closure");
             let (txid, autocommit) = match lock::acquire(tree, state, tx_timeout)? {
                 LockAcquired::Success { txid, autocommit } => (txid, autocommit),
                 LockAcquired::RollbackAndRetry { lock_txid } => {
                     return Ok(TxPayload::RollbackAndRetry(lock_txid));
                 }
             };
+            tracing::debug!("[update_data] lock acquired");
 
             let index_sync = IndexSync::new(tree, txid, table_name)?;
 

@@ -22,6 +22,8 @@ serde = { version = "1", features = ["derive"] }
 thiserror = "1"
 bincode = "1"
 sled = "0.34"
+tracing = "0.1"
+tracing-subscriber = "0.3"
 
 [dev-dependencies]
 test-suite = { package = "gluesql-test-suite", path = "../../test-suite", version = "0.11.0", features = [
@@ -31,7 +33,7 @@ test-suite = { package = "gluesql-test-suite", path = "../../test-suite", versio
 	"metadata",
 ] }
 criterion = "0.3"
-tokio = { version = "1", features = ["rt", "macros"] }
+tokio = { version = "1", features = ["rt", "macros", "time"] }
 
 [[bench]]
 name = "sled_benchmark"

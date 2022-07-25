@@ -14,7 +14,7 @@ use {
 
 pub struct Cli<T, W>
 where
-    T: GStore + GStoreMut,
+    T: GStore + GStoreMut + std::fmt::Debug,
     W: Write,
 {
     glue: Glue<T>,
@@ -23,7 +23,7 @@ where
 
 impl<T, W> Cli<T, W>
 where
-    T: GStore + GStoreMut,
+    T: GStore + GStoreMut + std::fmt::Debug,
     W: Write,
 {
     pub fn new(storage: T, output: W) -> Self {

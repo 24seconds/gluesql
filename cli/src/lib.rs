@@ -40,7 +40,7 @@ pub fn run() {
         run(MemoryStorage::default(), args.execute);
     }
 
-    fn run<T: GStore + GStoreMut>(storage: T, input: Option<PathBuf>) {
+    fn run<T: GStore + GStoreMut + std::fmt::Debug>(storage: T, input: Option<PathBuf>) {
         let output = std::io::stdout();
         let mut cli = Cli::new(storage, output);
 

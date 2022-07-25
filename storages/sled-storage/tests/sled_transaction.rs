@@ -24,12 +24,22 @@ const PATH_PREFIX: &str = "tmp/gluesql";
 
 macro_rules! exec {
     ($glue: ident $sql: literal) => {
+        let before = SystemTime::now();
+        tracing::debug!("[exec] before exec: literal {:?}, {:?}", $sql, before);
         $glue.execute($sql).unwrap();
+        let after = SystemTime::now();
+        tracing::debug!(
+            "[exec] after exec: literal {:?}, {:?} / elapsed: {:?}",
+            $sql,
+            after,
+            after.duration_since(before).unwrap().subsec_millis()
+        );
     };
 }
 
 macro_rules! test {
     ($glue: ident $sql: literal, $result: expr) => {
+        tracing::info!("[test] before test: literal: {:?}", $sql);
         let actual = $glue.execute($sql);
         assert_eq!(actual, $result.map(|payload| vec![payload]));
     };
@@ -410,6 +420,7 @@ async fn sled_transaction_gc() {
 
 const TX_TIMEOUT: Option<u128> = Some(200);
 const TX_SLEEP_TICK: Duration = Duration::from_millis(201);
+const TOKIO_SLEEP_TICK: u64 = 201;
 
 #[tokio::test]
 async fn sled_transaction_timeout_store() {
@@ -434,6 +445,7 @@ async fn sled_transaction_timeout_store() {
 
     // glue1 lock gets expired due to the timeout
     sleep();
+    // tokio::time::sleep(tokio::time::Duration::from_millis(TOKIO_SLEEP_TICK)).await;
 
     // timeout errors
     test!(glue1 "COMMIT;", Err(Error::StorageMsg("fetch failed - expired transaction has used (timeout)".to_owned())));
@@ -452,6 +464,8 @@ async fn sled_transaction_timeout_store() {
         )),
     );
 
+    println!("glue2 turn");
+
     exec!(glue2 "BEGIN;");
     exec!(glue2 "CREATE TABLE RealGarlic (id INTEGER);");
     exec!(glue1 "ROLLBACK;");
@@ -459,6 +473,7 @@ async fn sled_transaction_timeout_store() {
 
     // glue2 lock gets expired
     sleep();
+    // tokio::time::sleep(tokio::time::Duration::from_millis(TOKIO_SLEEP_TICK)).await;
 
     // glue1 must succeed to create tables: TxGarlic & RealGarlic
     exec!(glue1 "CREATE TABLE TxGarlic (id2 INTEGER);");
@@ -467,6 +482,7 @@ async fn sled_transaction_timeout_store() {
     exec!(glue1 "BEGIN;");
     exec!(glue1 "INSERT INTO TxGarlic VALUES (10);");
     sleep();
+    // tokio::time::sleep(tokio::time::Duration::from_millis(TOKIO_SLEEP_TICK)).await;
     exec!(glue2 "INSERT INTO TxGarlic VALUES (20);");
     test!(glue1 "COMMIT;", Err(Error::StorageMsg("fetch failed - expired transaction has used (timeout)".to_owned())));
     exec!(glue1 "ROLLBACK;");
@@ -486,6 +502,8 @@ async fn sled_transaction_timeout_store() {
 
     // glue1 lock gets expired
     sleep();
+    // tokio::time::sleep(tokio::time::Duration::from_millis(TOKIO_SLEEP_TICK)).await;
+    // tokio::time::sleep(tokio::time::Duration::from_millis(TOKIO_SLEEP_TICK)).await;
 
     // glue1 tx must rollback
     test!(
@@ -505,10 +523,20 @@ async fn sled_transaction_timeout_store() {
 
     // UPDATE
     exec!(glue1 "BEGIN;");
+    println!("[sled-transaction], glue1 BEGIN");
     exec!(glue1 "UPDATE TxGarlic SET id2 = id2 + 1;");
+    test!(
+        glue1 "SELECT * FROM TxGarlic;",
+        Ok(select!(id2 I64; 21))
+    );
+    println!("before sleep: {:?}", SystemTime::now());
     sleep();
-    exec!(glue2 "BEGIN;");
-    exec!(glue2 "UPDATE TxGarlic SET id2 = id2 + 1;");
+    // tokio::time::sleep(tokio::time::Duration::from_millis(TOKIO_SLEEP_TICK)).await;
+    println!("after sleep: {:?}", SystemTime::now());
+    exec!(glue2 "BEGIN;"); // ???
+    println!("after BEGIN: {:?}", SystemTime::now());
+    exec!(glue2 "UPDATE TxGarlic SET id2 = id2 + 1;"); // here
+    println!("after UPDATE: {:?}", SystemTime::now());
     exec!(glue2 "ROLLBACK;");
     exec!(glue1 "ROLLBACK;");
 
@@ -517,6 +545,7 @@ async fn sled_transaction_timeout_store() {
     exec!(glue1 "DELETE FROM TxGarlic;");
     test!(glue1 "SELECT * FROM TxGarlic;", Ok(select!(id2)));
     sleep();
+    // tokio::time::sleep(tokio::time::Duration::from_millis(TOKIO_SLEEP_TICK)).await;
     test!(glue2 "SELECT * FROM TxGarlic;", Ok(select!(id2 I64; 20)));
     exec!(glue2 "BEGIN;");
     exec!(glue2 "DELETE FROM TxGarlic");
@@ -529,6 +558,7 @@ async fn sled_transaction_timeout_store() {
     exec!(glue2 "BEGIN;");
     exec!(glue2 "DROP TABLE TxGarlic;");
     sleep();
+    // tokio::time::sleep(tokio::time::Duration::from_millis(TOKIO_SLEEP_TICK)).await;
     test!(glue2 "COMMIT;", Err(Error::StorageMsg("fetch failed - expired transaction has used (timeout)".to_owned())));
     exec!(glue1 "DROP TABLE TxGarlic;");
     test!(
@@ -542,8 +572,30 @@ async fn sled_transaction_timeout_store() {
     );
 }
 
+#[tracing::instrument]
 #[tokio::test]
 async fn sled_transaction_timeout_alter() {
+    let subscriber = tracing_subscriber::fmt()
+        // Use a more compact, abbreviated log format
+        .compact()
+        // Display source code file paths
+        .with_file(true)
+        // Display source code line numbers
+        .with_line_number(true)
+        // Display the thread ID an event was recorded on
+        .with_thread_ids(true)
+        // Don't display the event's target (module path)
+        .with_target(false)
+        .with_level(true)
+        .with_max_level(tracing::Level::DEBUG)
+        // Build the subscriber
+        .finish();
+
+    tracing::subscriber::set_global_default(subscriber).unwrap();
+
+    tracing::info!("geunyeong info");
+
+
     let path = &format!("{}/transaction_timeout_alter", PATH_PREFIX);
     fs::remove_dir_all(path).unwrap_or(());
 
@@ -567,6 +619,7 @@ async fn sled_transaction_timeout_alter() {
     test!(glue1 "SELECT * FROM TxAlter;", Ok(select!(id I64; 1)));
     test!(glue2 "SELECT * FROM TxAlter;", Ok(select!(id | num I64 | I64; 1 100)));
     sleep();
+    // tokio::time::sleep(tokio::time::Duration::from_millis(TOKIO_SLEEP_TICK)).await;
     test!(glue2 "SELECT * FROM TxAlter;", Ok(select!(id | num I64 | I64; 1 100)));
     exec!(glue2 "BEGIN;");
     exec!(glue2 "ALTER TABLE TxAlter DROP COLUMN num;");
@@ -581,6 +634,7 @@ async fn sled_transaction_timeout_alter() {
     exec!(glue1 "ROLLBACK;");
     test!(glue1 "SELECT * FROM TxAlter;", Ok(select!(id | num I64 | I64; 1 100)));
     sleep();
+    // tokio::time::sleep(tokio::time::Duration::from_millis(TOKIO_SLEEP_TICK)).await;
     test!(glue1 "SELECT * FROM TxAlter;", Ok(select!(id | num I64 | I64; 1 100)));
     exec!(glue2 "ROLLBACK;");
     test!(glue2 "SELECT * FROM TxAlter;", Ok(select!(id | num I64 | I64; 1 100)));
@@ -591,6 +645,7 @@ async fn sled_transaction_timeout_alter() {
     test!(glue1 "SELECT * FROM TxAlter;", Ok(select!(jd | num I64 | I64; 1 100)));
     test!(glue2 "SELECT * FROM TxAlter;", Ok(select!(id | num I64 | I64; 1 100)));
     sleep();
+    // tokio::time::sleep(tokio::time::Duration::from_millis(TOKIO_SLEEP_TICK)).await;
     exec!(glue2 "BEGIN;");
     exec!(glue2 "ALTER TABLE TxAlter RENAME COLUMN id TO kd;");
     exec!(glue2 "COMMIT;");
@@ -612,10 +667,13 @@ async fn sled_transaction_timeout_alter() {
         Err(FetchError::TableNotFound("TxAlterericano".to_owned()).into())
     );
     sleep();
+    // tokio::time::sleep(tokio::time::Duration::from_millis(TOKIO_SLEEP_TICK)).await;
     exec!(glue1 "ALTER TABLE TxAlter RENAME TO TxSoprano;");
     test!(glue1 "SELECT * FROM TxSoprano;", Ok(select!(kd | num I64 | I64; 1 100)));
     exec!(glue2 "ROLLBACK;");
     test!(glue2 "SELECT * FROM TxSoprano;", Ok(select!(kd | num I64 | I64; 1 100)));
+
+    tracing::info!("timeout_alter test done");
 }
 
 #[tokio::test]
@@ -648,6 +706,7 @@ async fn sled_transaction_timeout_index() {
         Ok(select!(id I64; 1))
     );
     sleep();
+    // tokio::time::sleep(tokio::time::Duration::from_millis(201)).await;
     exec!(glue2 "CREATE INDEX idx_id ON TxIndex (id);");
     test_idx!(
         glue2 "SELECT * FROM TxIndex WHERE id = 1;",
@@ -670,6 +729,7 @@ async fn sled_transaction_timeout_index() {
         Ok(select!(id I64; 1))
     );
     sleep();
+    // tokio::time::sleep(tokio::time::Duration::from_millis(201)).await;
     test_idx!(
         glue2 "SELECT * FROM TxIndex WHERE id = 1;",
         idx!(idx_id, Eq, "1"),
@@ -692,6 +752,7 @@ async fn sled_transaction_timeout_index() {
     exec!(glue1 "DROP INDEX TxIndex.idx_id;");
     exec!(glue1 "CREATE INDEX idx_id ON TxIndex (id);");
     sleep();
+    // tokio::time::sleep(tokio::time::Duration::from_millis(201)).await;
     test_idx!(
         glue2 "SELECT * FROM TxIndex WHERE id = 1;",
         idx!(idx_id, Eq, "1"),
@@ -712,8 +773,10 @@ async fn sled_transaction_timeout_index() {
     exec!(glue1 "BEGIN;");
     exec!(glue1 "DROP INDEX TxIndex.idx_id;");
     sleep();
+    // tokio::time::sleep(tokio::time::Duration::from_millis(201)).await;
     exec!(glue2 "DROP INDEX TxIndex.idx_id;");
     sleep();
+    // tokio::time::sleep(tokio::time::Duration::from_millis(201)).await;
     exec!(glue1 "ROLLBACK;");
     exec!(glue1 "CREATE INDEX idx_id ON TxIndex (id);");
     test_idx!(

@@ -1,3 +1,5 @@
+use std::backtrace::Backtrace;
+
 use {
     super::{err_into, State},
     gluesql_core::result::{Error, Result},
@@ -55,6 +57,15 @@ pub fn register(tree: &Db, id_offset: u64) -> Result<(u64, u128)> {
         .map(|tx_data| tree.insert(key, tx_data))?
         .map_err(err_into)?;
 
+    tracing::debug!(
+        "[register] TxData: {:?} / now: {:?}",
+        &tx_data,
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis()
+    );
+
     Ok((txid, created_at))
 }
 
@@ -97,11 +108,20 @@ pub enum LockAcquired {
     RollbackAndRetry { lock_txid: u64 },
 }
 
+#[tracing::instrument]
 pub fn acquire(
     tree: &TransactionalTree,
     state: &State,
     tx_timeout: Option<u128>,
 ) -> ConflictableTransactionResult<LockAcquired, Error> {
+    println!(
+        "[lock] started, now: {:?}",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis()
+    );
+
     let Lock {
         lock_txid,
         lock_created_at,
@@ -113,6 +133,14 @@ pub fn acquire(
         .map_err(err_into)
         .map_err(ConflictableTransactionError::Abort)?
         .unwrap_or_default();
+
+    tracing::trace!(
+        "[lock] after tree operation, now: {:?}",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis()
+    );
 
     let (txid, created_at, autocommit) = match state {
         State::Transaction {
@@ -128,6 +156,14 @@ pub fn acquire(
         }
     };
 
+    println!(
+        "[lock] after state check, now: {:?}",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis()
+    );
+
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(err_into)
@@ -135,6 +171,13 @@ pub fn acquire(
         .as_millis();
 
     if tx_timeout.map(|tx_timeout| now - created_at >= tx_timeout) == Some(true) {
+        tracing::debug!("[lock] state: {:?}", state);
+        tracing::debug!("[lock] tx_timeout: {:?}", tx_timeout);
+        tracing::debug!("[lock] now: {:?}, created_at {:?}", now, created_at);
+
+        // let bt = Backtrace::capture();
+        // println!("{}", bt);
+
         return Err(Error::StorageMsg(
             "acquire failed - expired transaction has used (timeout)".to_owned(),
         ))

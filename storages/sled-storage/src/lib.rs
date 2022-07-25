@@ -1,3 +1,5 @@
+#![feature(backtrace)]
+
 mod alter_table;
 mod error;
 mod gc;

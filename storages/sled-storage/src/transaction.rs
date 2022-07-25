@@ -55,6 +55,8 @@ pub enum TxPayload {
 #[async_trait(?Send)]
 impl Transaction for SledStorage {
     async fn begin(self, autocommit: bool) -> MutResult<Self, bool> {
+        tracing::info!("begin call??, state: {:?}", self.state);
+
         match (&self.state, autocommit) {
             (State::Transaction { .. }, false) => Err((
                 self,

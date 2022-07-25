@@ -80,10 +80,12 @@ pub enum PayloadVariable {
 }
 
 #[cfg(feature = "transaction")]
-pub async fn execute_atomic<T: GStore + GStoreMut>(
+pub async fn execute_atomic<T: GStore + GStoreMut + std::fmt::Debug>(
     storage: T,
     statement: &Statement,
 ) -> MutResult<T, Payload> {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
     if matches!(
         statement,
         Statement::StartTransaction | Statement::Rollback | Statement::Commit
@@ -91,8 +93,30 @@ pub async fn execute_atomic<T: GStore + GStoreMut>(
         return execute(storage, statement).await;
     }
 
+    let start = SystemTime::now();
+    tracing::debug!(
+        "[execute] befor begin: {:?}",
+        start.duration_since(UNIX_EPOCH).unwrap().as_millis()
+    );
     let (storage, autocommit) = storage.begin(true).await?;
+    tracing::debug!(
+        "[execute] after begin, now: {:?}, elapsed: {:?}",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis(),
+        start.elapsed().unwrap().as_micros()
+    );
+    let middle = SystemTime::now();
     let result = execute(storage, statement).await;
+    tracing::debug!(
+        "[execute] after result, now: {:?}, elapsed: {:?}",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis(),
+        middle.elapsed().unwrap().as_micros()
+    );
 
     match (result, autocommit) {
         (Ok((storage, payload)), true) => {
@@ -109,7 +133,7 @@ pub async fn execute_atomic<T: GStore + GStoreMut>(
     }
 }
 
-pub async fn execute<T: GStore + GStoreMut>(
+pub async fn execute<T: GStore + GStoreMut + std::fmt::Debug>(
     storage: T,
     statement: &Statement,
 ) -> MutResult<T, Payload> {
@@ -180,6 +204,7 @@ pub async fn execute<T: GStore + GStoreMut>(
             source,
             ..
         } => {
+            tracing::debug!("[Statement::Insert], code start");
             let (rows, table_name) = try_block!(storage, {
                 let table_name = get_name(table_name)?;
                 let Schema { column_defs, .. } = storage
@@ -221,6 +246,7 @@ pub async fn execute<T: GStore + GStoreMut>(
             });
 
             let num_rows = rows.len();
+            tracing::debug!("[Statement::Insert], before insert data to stoarge");
 
             storage
                 .insert_data(table_name, rows)
@@ -232,6 +258,7 @@ pub async fn execute<T: GStore + GStoreMut>(
             selection,
             assignments,
         } => {
+            tracing::debug!("[Statement::Update], code start");
             let (table_name, rows) = try_block!(storage, {
                 let table_name = get_name(table_name)?;
                 let Schema { column_defs, .. } = storage
@@ -270,6 +297,7 @@ pub async fn execute<T: GStore + GStoreMut>(
             });
 
             let num_rows = rows.len();
+            tracing::debug!("[Statement::Update], before update data to stoarge");
 
             storage
                 .update_data(table_name, rows)
