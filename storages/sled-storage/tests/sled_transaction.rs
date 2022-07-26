@@ -25,10 +25,10 @@ const PATH_PREFIX: &str = "tmp/gluesql";
 macro_rules! exec {
     ($glue: ident $sql: literal) => {
         let before = SystemTime::now();
-        tracing::debug!("[exec] before exec: literal {:?}, {:?}", $sql, before);
+        tracing::info!("[exec] before exec: literal {:?}, {:?}", $sql, before);
         $glue.execute($sql).unwrap();
         let after = SystemTime::now();
-        tracing::debug!(
+        tracing::info!(
             "[exec] after exec: literal {:?}, {:?} / elapsed: {:?}",
             $sql,
             after,
@@ -593,7 +593,7 @@ async fn sled_transaction_timeout_alter() {
 
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
-    tracing::info!("geunyeong info");
+    tracing::info!("sled_transaction_timeout_alter");
 
 
     let path = &format!("{}/transaction_timeout_alter", PATH_PREFIX);
