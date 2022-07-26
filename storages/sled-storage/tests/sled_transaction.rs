@@ -588,6 +588,8 @@ async fn sled_transaction_timeout_alter() {
         .with_target(false)
         .with_level(true)
         .with_max_level(tracing::Level::DEBUG)
+        .with_thread_names(true)
+        .with_target(true)
         // Build the subscriber
         .finish();
 
