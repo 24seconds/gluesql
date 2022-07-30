@@ -411,8 +411,7 @@ async fn sled_transaction_gc() {
 const TX_TIMEOUT: Option<u128> = Some(200);
 const TX_SLEEP_TICK: Duration = Duration::from_millis(201);
 
-#[tokio::test]
-async fn sled_transaction_timeout_store() {
+async fn sled_transaction_timeout_store() -> () {
     let path = &format!("{}/transaction_timeout_store", PATH_PREFIX);
     fs::remove_dir_all(path).unwrap_or(());
 
@@ -540,13 +539,14 @@ async fn sled_transaction_timeout_store() {
         glue2 "SELECT * FROM TxGarlic;",
         Err(FetchError::TableNotFound("TxGarlic".to_owned()).into())
     );
+
+    ()
 }
 
-const TX_TIMEOUT_1: Option<u128> = Some(500);
-const TX_SLEEP_TICK_1: Duration = Duration::from_millis(501);
+const TX_TIMEOUT_1: Option<u128> = Some(200);
+const TX_SLEEP_TICK_1: Duration = Duration::from_millis(201);
 
-#[tokio::test]
-async fn sled_transaction_timeout_alter() {
+async fn sled_transaction_timeout_alter() -> () {
     let path = &format!("{}/transaction_timeout_alter", PATH_PREFIX);
     fs::remove_dir_all(path).unwrap_or(());
 
@@ -619,14 +619,17 @@ async fn sled_transaction_timeout_alter() {
     test!(glue1 "SELECT * FROM TxSoprano;", Ok(select!(kd | num I64 | I64; 1 100)));
     exec!(glue2 "ROLLBACK;");
     test!(glue2 "SELECT * FROM TxSoprano;", Ok(select!(kd | num I64 | I64; 1 100)));
+
+    ()
 }
 
 
-const TX_TIMEOUT_2: Option<u128> = Some(400);
-const TX_SLEEP_TICK_2: Duration = Duration::from_millis(401);
+const TX_TIMEOUT_2: Option<u128> = Some(200);
+const TX_SLEEP_TICK_2: Duration = Duration::from_millis(201);
 
-#[tokio::test]
-async fn sled_transaction_timeout_index() {
+
+
+async fn sled_transaction_timeout_index() -> () {
     use ast::IndexOperator::Eq;
 
     let path = &format!("{}/transaction_timeout_index", PATH_PREFIX);
@@ -778,4 +781,12 @@ fn sled_transaction_metadata() {
     test_tables!(glue1 "Foo");
     test_tables!(glue2 "Foo");
     test_tables!(glue3 "Foo");
+}
+
+
+#[tokio::test]
+async fn sled_transaction_timeout_total() {
+    sled_transaction_timeout_store().await; 
+    sled_transaction_timeout_alter().await;
+    sled_transaction_timeout_index().await;
 }
