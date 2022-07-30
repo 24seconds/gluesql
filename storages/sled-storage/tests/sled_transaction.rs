@@ -542,20 +542,23 @@ async fn sled_transaction_timeout_store() {
     );
 }
 
+const TX_TIMEOUT_1: Option<u128> = Some(500);
+const TX_SLEEP_TICK_1: Duration = Duration::from_millis(501);
+
 #[tokio::test]
 async fn sled_transaction_timeout_alter() {
     let path = &format!("{}/transaction_timeout_alter", PATH_PREFIX);
     fs::remove_dir_all(path).unwrap_or(());
 
     let mut storage1 = SledStorage::new(path).unwrap();
-    storage1.set_transaction_timeout(TX_TIMEOUT);
+    storage1.set_transaction_timeout(TX_TIMEOUT_1);
     let storage2 = storage1.clone();
 
     let mut glue1 = Glue::new(storage1);
     let mut glue2 = Glue::new(storage2);
 
     let sleep = || {
-        std::thread::sleep(TX_SLEEP_TICK);
+        std::thread::sleep(TX_SLEEP_TICK_1);
     };
 
     exec!(glue1 "CREATE TABLE TxAlter (id INTEGER, num INTEGER);");
@@ -618,6 +621,10 @@ async fn sled_transaction_timeout_alter() {
     test!(glue2 "SELECT * FROM TxSoprano;", Ok(select!(kd | num I64 | I64; 1 100)));
 }
 
+
+const TX_TIMEOUT_2: Option<u128> = Some(1000);
+const TX_SLEEP_TICK_2: Duration = Duration::from_millis(1001);
+
 #[tokio::test]
 async fn sled_transaction_timeout_index() {
     use ast::IndexOperator::Eq;
@@ -626,14 +633,14 @@ async fn sled_transaction_timeout_index() {
     fs::remove_dir_all(path).unwrap_or(());
 
     let mut storage1 = SledStorage::new(path).unwrap();
-    storage1.set_transaction_timeout(TX_TIMEOUT);
+    storage1.set_transaction_timeout(TX_TIMEOUT_2);
     let storage2 = storage1.clone();
 
     let mut glue1 = Glue::new(storage1);
     let mut glue2 = Glue::new(storage2);
 
     let sleep = || {
-        std::thread::sleep(TX_SLEEP_TICK);
+        std::thread::sleep(TX_SLEEP_TICK_2);
     };
 
     exec!(glue1 "CREATE TABLE TxIndex (id INTEGER);");
