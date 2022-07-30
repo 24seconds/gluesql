@@ -622,8 +622,8 @@ async fn sled_transaction_timeout_alter() {
 }
 
 
-const TX_TIMEOUT_2: Option<u128> = Some(1000);
-const TX_SLEEP_TICK_2: Duration = Duration::from_millis(1001);
+const TX_TIMEOUT_2: Option<u128> = Some(10000);
+const TX_SLEEP_TICK_2: Duration = Duration::from_millis(10001);
 
 #[tokio::test]
 async fn sled_transaction_timeout_index() {
